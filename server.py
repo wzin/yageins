@@ -11,7 +11,7 @@ app = Flask(__name__)
 __report_indent = [0]
 
 def debug(fn):
-    def wrap(*params,**kwargs):
+    def wrap(self, *params,**kwargs):
         call = wrap.callcount = wrap.callcount + 1
 
         indent = ' ' * __report_indent[0]
@@ -20,16 +20,16 @@ def debug(fn):
             ["%s = %s" % (a, repr(b)) for a,b in kwargs.items()]
         ))
 
-        debug = True
-        if debug == True:
+        #debug = True
+        if self.debug == 'True':
             print "%s%s called [#%s]" % (indent, fc, call)
             __report_indent[0] += 1
-            ret = fn(*params,**kwargs)
+            ret = fn(self, *params,**kwargs)
             __report_indent[0] -= 1
             print "%s%s returned %s [#%s]" % (indent, fc, repr(ret), call)
             return ret
         else:
-            ret = fn(*params,**kwargs)
+            ret = fn(self, *params,**kwargs)
             return ret
     wrap.callcount = 0
     return wrap
@@ -53,24 +53,32 @@ class Options:
                                help="Enable debug True|False",
                                metavar="DEBUG")
         (self.options, self.args) = self.parser.parse_args()
+        self.debug = self.options.debug
 
+    def __repr__(self):
+        return 'Options'
+
+    @debug
     def get_options(self):
-	return self.options
+	    return self.options
 
 class Config():
     def __init__(self, options):
         self.options = options
+        self.debug = self.options.debug
         self.config = ConfigParser.RawConfigParser()
         self.config.read(self.options.config)
 
+    @debug
     def get_config(self):
         return self.config
 
 
 class IrcChannel:
-    def __init__(self, channel_name, config):
+    def __init__(self, channel_name, config, options):
         self.name = channel_name
         self.path = config.get(channel_name, 'path')
+        self.debug = options.debug
         #echo %s | timeout -k 6 3 tee -a '%s' >/dev/null
         self.write_command = config.get('global', 'write_command')
 
@@ -91,15 +99,14 @@ class Yageins:
         self.debug = self.options.debug
         self.host = self.config.get('global', 'host')
         self.port = self.config.getint('global', 'port')
-        self.secret_token = self.config.get('global', 'secret_token')
         self.event_messages = {
                                 "push" : "%s pushed to %s: %s",
                                 "create" : "%s created branch %s %s",
                                 "delete" : "%s deleted branch %s %s",
                                 "pull_request" : "%s changed pull request state to '%s' for branch %s %s",
-                                "issues" : "%s changed issue state for %s %s",
-                                "issues_comment" : "%s commented on issue %s %s",
-                                "pull_request_review_comment" : "%s commented on pull request %s %s"
+                                "issues" : "%s changed issue state for %s to %s %s",
+                                "issue_comment" : "%s commented on issue '%s' %s",
+                                "pull_request_review_comment" : "%s commented on '%s' %s"
                               }
 
     def __repr__(self):
@@ -107,7 +114,7 @@ class Yageins:
 
     @debug
     def _write_to_channel(self, channel_name, message, message_type='push'):
-        channel = IrcChannel(channel_name, config)
+        channel = IrcChannel(channel_name, config, self.options)
         return channel.write_to_channel(message)
 
     @debug
@@ -156,51 +163,50 @@ class Yageins:
 
     @debug
     def _handle_delete_branch(self, req_data, action):
+        pusher = req_data['sender']['login']
+        branch_name = req_data['ref']
         repo_name = req_data['repository']['full_name']
-        pusher = req_data['pusher']['name']
-        message = req_data['head_commit']['message'].split('\n')[0]
-        compare_url = req_data['compare']
-        gin
-        branch_name = req_data['ref'].replace('refs/heads/','')
-        message = self.event_messages[action] % (pusher, branch_name, compare_url)
+        url = req_data['repository']['clone_url']
+        message = self.event_messages[action] % (pusher, branch_name, url)
         self._write_to_channel(self._channel_for(repo_name, branch_name), message)
 
     @debug
     def _handle_create_branch(self, req_data, action):
+        pusher = req_data['sender']['login']
+        branch_name = req_data['ref']
         repo_name = req_data['repository']['full_name']
-        pusher = req_data['pusher']['name']
-        message = req_data['head_commit']['message'].split('\n')[0]
-        compare_url = req_data['compare']
-        branch_name = req_data['ref'].replace('refs/heads/','')
-        message = self.event_messages[action] % (pusher, branch_name, compare_url)
+        url = req_data['repository']['clone_url']
+        message = self.event_messages[action] % (pusher, branch_name, url)
         self._write_to_channel(self._channel_for(repo_name, branch_name), message)
 
     @debug
     def _handle_issues(self, req_data, action):
+        action = req_data['action']
         repo_name = req_data['repository']['full_name']
-        pusher = req_data['pusher']['name']
-        message = req_data['head_commit']['message'].split('\n')[0]
-        compare_url = req_data['compare']
-        branch_name = req_data['ref'].replace('refs/heads/','')
-        message = self.event_messages[action] % (pusher, branch_name, compare_url)
+        pusher = req_data['sender']['login']
+        url = req_data['issue']['html_url']
+        branch_name = 'master'
+        message = self.event_messages[action] % (who, issue_name, action, url)
         self._write_to_channel(self._channel_for(repo_name, branch_name), message)
 
-    def _handle_issues_comment(self, req_data, action):
+    @debug
+    def _handle_issue_comment(self, req_data, action):
+        who = req_data['comment']['user']['login']
+        url = req_data['comment']['html_url']
+        issue_title = req_data['issue']['title']
         repo_name = req_data['repository']['full_name']
-        pusher = req_data['pusher']['name']
-        message = req_data['head_commit']['message'].split('\n')[0]
-        compare_url = req_data['compare']
-        branch_name = req_data['ref'].replace('refs/heads/','')
-        message = self.event_messages[action] % (pusher, branch_name, compare_url)
+        branch_name = None
+        message = self.event_messages[action] % (who, issue_title, url)
         self._write_to_channel(self._channel_for(repo_name, branch_name), message)
 
+    @debug
     def _handle_pull_request_review_comment(self, req_data, action):
+        who = req_data['comment']['user']['login']
+        url = req_data['comment']['html_url']
+        issue_title = req_data['issue']['title']
         repo_name = req_data['repository']['full_name']
-        pusher = req_data['pusher']['name']
-        message = req_data['head_commit']['message'].split('\n')[0]
-        compare_url = req_data['compare']
-        branch_name = req_data['ref'].replace('refs/heads/','')
-        message = self.event_messages[action] % (pusher, branch_name, compare_url)
+        branch_name = None
+        message = self.event_messages[action] % (who, issue_title, url)
         self._write_to_channel(self._channel_for(repo_name, branch_name), message)
 
     @debug
@@ -221,24 +227,26 @@ class Yageins:
             self._handle_push(data, action)
         elif action == 'issues':
             self._handle_issues(data, action)
-        elif action == 'issues_comment':
+        elif action == 'issue_comment':
             self._handle_issue_comment(data, action)
         elif action == 'pull_request_review_comment':
             self._handle_pull_request_review_comment(data, action)
+        else:
+            print "Unknown action %s " % action
         pass
 
     @debug
     def parse(self, request):
-        with open('/tmp/debug', 'w') as myfile:
-            myfile.write(request.data)
         self._route_request(request)
         return True
 
 
+@debug
 @app.route('/')
 def slash():
     return 'Hi it\'s Yageins here - for submitting payload got to /payload'
 
+@debug
 @app.route('/payload', methods=['POST'])
 def payload():
     if yageins.parse(request):

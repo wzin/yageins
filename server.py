@@ -6,6 +6,9 @@ from optparse import OptionParser
 import os
 import pprint
 
+#TODO : add exception handling when there are no branches_to_channels
+#TODO : add global default channel for every unconfigured channel
+
 app = Flask(__name__)
 
 __report_indent = [0]
@@ -125,10 +128,14 @@ class Yageins:
     def _parse_channels(self, repo_name):
         """ Should return dictionary of repo_branch : channel_name """
         channels = {}
-        channels_map = self.config.get(repo_name, 'branches_to_channels').split(',')
-        for channel_pair in channels_map:
-            branch_name, channel_name = channel_pair.split(':')
-            channels[branch_name] = channel_name
+        try:
+            channels_map = self.config.get(repo_name, 'branches_to_channels').split(',')
+            for channel_pair in channels_map:
+                branch_name, channel_name = channel_pair.split(':')
+                channels[branch_name] = channel_name
+        except Exception, e:
+            print 'No channel configured for %s' % repo_name
+            channels[repo_name] = self.config.get('global', 'default_channel')
         return channels
 
     @debug
@@ -137,7 +144,7 @@ class Yageins:
         try:
             channel_name = channels[branch_name]
         except Exception, e:
-            channel_name = self.config.get(repo_name, 'default_channel')
+            channel_name = self.config.get('global', 'default_channel')
         return channel_name
 
     @debug

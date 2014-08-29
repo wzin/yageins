@@ -103,7 +103,7 @@ class Yageins:
         self.host = self.config.get('global', 'host')
         self.port = self.config.getint('global', 'port')
         self.event_messages = {
-                                "push" : "%s pushed to %s: %s",
+                                "push" : "%s pushed to %s %s: %s",
                                 "create" : "%s created branch %s %s",
                                 "delete" : "%s deleted branch %s %s",
                                 "pull_request" : "%s changed pull request state to '%s' for branch %s %s",
@@ -151,9 +151,14 @@ class Yageins:
     def _handle_push(self, req_data, action):
         repo_name = req_data['repository']['full_name']
         pusher = req_data['pusher']['name']
+        deleted = req_data['deleted']
+        if deleted == True:
+            deleted_message = 'and deleted it'
+        else:
+            deleted_message = ''
         compare_url = req_data['compare']
         branch_name = req_data['ref'].replace('refs/heads/','')
-        message = self.event_messages[action] % (pusher, branch_name, compare_url)
+        message = self.event_messages[action] % (pusher, branch_name, deleted_message, compare_url)
         self._write_to_channel(self._channel_for(repo_name, branch_name), message)
 
     @debug

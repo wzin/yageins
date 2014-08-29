@@ -192,12 +192,13 @@ class Yageins:
 
     @debug
     def _handle_issues(self, req_data, action):
-        action = req_data['action']
+        issue_action = req_data['action']
         repo_name = req_data['repository']['full_name']
-        pusher = req_data['sender']['login']
+        issue_name = "'" + req_data['issue']['title'] + "'"
+        who = req_data['sender']['login']
         url = req_data['issue']['html_url']
         branch_name = 'master'
-        message = self.event_messages[action] % (who, issue_name, action, url)
+        message = self.event_messages[action] % (who, issue_name, issue_action, url)
         self._write_to_channel(self._channel_for(repo_name, branch_name), message)
 
     @debug

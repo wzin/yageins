@@ -151,7 +151,6 @@ class Yageins:
     def _handle_push(self, req_data, action):
         repo_name = req_data['repository']['full_name']
         pusher = req_data['pusher']['name']
-        message = req_data['head_commit']['message'].split('\n')[0]
         compare_url = req_data['compare']
         branch_name = req_data['ref'].replace('refs/heads/','')
         message = self.event_messages[action] % (pusher, branch_name, compare_url)
@@ -162,7 +161,7 @@ class Yageins:
         repo_name = req_data['pull_request']['base']['repo']['full_name']
         pull_request_action = req_data['action']
         compare_url = req_data['pull_request']['_links']['html']['href']
-        pusher = req_data['pull_request']['base']['user']['login']
+        pusher = req_data['pull_request']['sender']['login']
         branch_name = req_data['pull_request']['base']['ref']
         message = self.event_messages[action] % (pusher, pull_request_action, branch_name, compare_url)
         print message

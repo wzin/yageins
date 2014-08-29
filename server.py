@@ -161,7 +161,7 @@ class Yageins:
         repo_name = req_data['pull_request']['base']['repo']['full_name']
         pull_request_action = req_data['action']
         compare_url = req_data['pull_request']['_links']['html']['href']
-        pusher = req_data['pull_request']['sender']['login']
+        pusher = req_data['sender']['login']
         branch_name = req_data['pull_request']['base']['ref']
         message = self.event_messages[action] % (pusher, pull_request_action, branch_name, compare_url)
         print message

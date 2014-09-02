@@ -222,6 +222,10 @@ class Yageins:
         self._write_to_channel(self._channel_for(repo_name, branch_name), message)
 
     @debug
+    def _handle_ping(self):
+        return True
+        
+    @debug
     def _handle_commit(self, req_data):
         pass
 
@@ -243,6 +247,8 @@ class Yageins:
             self._handle_issue_comment(data, action)
         elif action == 'pull_request_review_comment':
             self._handle_pull_request_review_comment(data, action)
+        elif action == 'ping':
+            self._handle_ping()
         else:
             print "Unknown action %s " % action
         pass

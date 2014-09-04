@@ -4,10 +4,9 @@ import json
 import ConfigParser
 from optparse import OptionParser
 import os
-import pprint
 
-#TODO : add exception handling when there are no branches_to_channels
-#TODO : add global default channel for every unconfigured channel
+# TODO : add exception handling when there are no branches_to_channels
+# TODO : add global default channel for every unconfigured channel
 
 app = Flask(__name__)
 
@@ -144,7 +143,10 @@ class Yageins:
         try:
             channel_name = channels[branch_name]
         except Exception, e:
-            channel_name = self.config.get('global', 'default_channel')
+            try:
+                channel_name = self.config.get(repo_name, 'default_channel')
+            except Exception, e:
+                channel_name = self.config.get('global', 'default_channel')
         return channel_name
 
     @debug
